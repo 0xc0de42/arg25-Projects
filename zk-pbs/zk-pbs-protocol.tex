@@ -1,0 +1,58 @@
+\begin{table}[h!]
+\centering
+
+% Rename "Table" to "Protocol" for this float
+\renewcommand{\tablename}{Protocol}
+
+% Resize the tblr environment for consistent width
+\resizebox{1\textwidth}{!}{
+\begin{tblr}{
+    hline{1,Z} = {solid, 1pt},
+    colspec     = { Q[c,$] c Q[c,$] c Q[c,$] },
+    row{1-2}    = {mode=text},
+    row{3-Z}    = {rowsep=3ex}
+}
+
+% Participating Entities
+Proposer & & Builder_{j} & & Prover \\
+
+% Step 1 - pre processing
+$\begin{gathered}[b]
+    B_{i, j-1}, F_{i, j-1}
+\end{gathered}$ 
+& & & \\
+
+% Step 2 - Block hash submission
+&
+&
+$b_{i,j}, f_{i,j}$ 
+&
+\tikz \draw[->] (0,0) to node[above] {$h(b_{i,j}) \,||\, f_{i,j}$} (2.3,0);
+\\
+
+% Step 3 - Block hash selection and signing
+\begin{gathered}[b]
+s = \arg\max_{b_{i,k} \in B_{i,j}} f_k \\
+m = h(b_{i,s}) \,||\, f_{i,s} \,||\, s
+\end{gathered}
+&
+\tikz \draw[<-] (0,0) to node[above] {$m_{i,j} \,||\, sig(m_{i,j})$} (2.3,0);
+&
+$m_{i,j} := \pi(b_{i,j}) \,||\, h(b_{i,j}) \,||\, b_{i,j} \,||\, f_{i,j}$ 
+& 
+\tikz \draw[<-] (0,0) to ["$\pi_{b_{i,j}}$"] (2.3,0); 
+\\
+
+% Step 4 - Block submission
+\begin{gathered}[b]
+\tikz \draw[<-] (0,0) to ["Gossip $m_{i,s} \,||\, sig(m_{i,s})$"] (2.3,0);
+\end{gathered}
+\\
+
+\end{tblr}
+} % end resizebox
+
+\caption{Non-Interactive Zero-Knowledge PBS}
+\label{protocol:NIZK-PBS}
+
+\end{table}

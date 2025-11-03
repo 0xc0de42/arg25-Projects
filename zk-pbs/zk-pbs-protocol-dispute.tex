@@ -1,0 +1,25 @@
+% zk-pbs-dispute.tex
+\begin{figure}[h!]
+\centering
+
+% keep width consistent with other protocol figures
+\resizebox{0.75\textwidth}{!}{
+\begin{tblr}{
+    colspec = {Q[c,$] c Q[c,$]},
+    hline{1,Z} = {solid,1pt},
+    row{1} = {mode=text},
+    row{2-Z} = {rowsep=3ex}
+}
+Smart Contract & & Challenger \\
+
+% 1) challenger triggers contract
+$Verify(b_{i})$ &
+\tikz \draw[<-] (0,0) -- node[above]{$i$} (2.5,0); &
+\\
+
+\end{tblr}
+}
+
+\caption{Single-round dispute activation: the challenger calls the smart contract with the disputed block number $i$; the contract verifies it (if not already verified) and, on first valid dispute, slashes the corresponding entities.}
+\label{protocol:dispute_resolution}
+\end{figure}

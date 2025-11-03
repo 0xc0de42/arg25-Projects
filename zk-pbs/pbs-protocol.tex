@@ -1,0 +1,75 @@
+% pbs-protocol.tex
+\begin{table}[h!]
+\centering
+
+% Rename "Table" to "Protocol" for this float
+\renewcommand{\tablename}{Protocol}
+
+% Keep all protocol diagrams at a consistent width
+\resizebox{1\textwidth}{!}{
+\begin{tblr}{
+    hline{1,Z} = {solid, 1pt},
+    colspec     = { Q[c,$] c Q[c,$] c Q[c,$] },
+    row{1-2}    = {mode=text},
+    row{3-Z}    = {rowsep=3ex}
+}
+
+% Participating Entities
+Proposer & & Relay & & Builder_{j}\\
+
+% Step 1 - pre-processing
+& &
+$\begin{gathered}[b]
+    B_{i, j-1}, F_{i, j-1}
+\end{gathered}$ 
+& & \\
+
+% Step 2 - Block set submission
+$B_{i,j}, F_{i,j}$ &
+\tikz \draw[<-] (0,0) to node[above] {$B_{i,j}, F_{i,j}$} (2.3,0);
+&
+\begin{gathered}[b]
+    B_{i,j} := B_{i,j} \cup h(b_{i,j-1}), \\
+    F_{i,j} := F_{i,j} \cup f_{i,j-1}
+\end{gathered}
+&
+\tikz \draw[<-] (0,0) to ["$b_{i,j} \,||\, f_{i,j}$"] (2.3,0);
+&
+$b_{i,j}, f$
+\\
+
+% Step 3 - Block hash selection and signing
+\begin{gathered}[b]
+s = \arg\max_{b_{i,k} \in B_{i,j}} f_k \\
+m = h(b_{i,s}) \,||\, f_{i,s} \,||\, s
+\end{gathered}
+&
+\tikz \draw[->] (0,0) to node[above] {$m \,||\, sig(m)$} (2.3,0);
+& & & 
+\\
+
+% Step 4 - Block submission
+\begin{gathered}[b]
+\text{Gossip } b_{i,s}
+\end{gathered}
+& 
+\tikz \draw[<-] (0,0) to ["$b_{i,s}$"] (2.3,0);
+& & & 
+\\
+
+% Step 5 - Rewards
+$f_{i,s} := r_p + r_r + r_b$
+& 
+\tikz \draw[->] (0,0) to ["$r_r + r_b$"] (2.3,0);
+& &
+\tikz \draw[->] (0,0) to ["$r_b$"] (2.3,0);
+& 
+\\
+
+\end{tblr}
+} % end resizebox
+
+\caption{PBS — Relay-Assisted Block Submission}
+\label{protocol:relay_block_submission}
+
+\end{table}

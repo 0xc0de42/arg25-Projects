@@ -1,0 +1,49 @@
+% in the preamble:
+% \usepackage{tikz}
+% \usetikzlibrary{positioning, arrows.meta, shapes, fit}
+
+\begin{tikzpicture}[
+  node distance=1cm and 1cm,
+  every node/.style={font=\sffamily, align=center},
+  box/.style={draw, thick, rounded corners, minimum width=3.2cm, minimum height=1cm, fill=green!10},
+  subbox/.style={draw, thick, rounded corners, minimum width=3.2cm, minimum height=1cm, fill=blue!10},
+  whitebox/.style={draw, thick, rounded corners, minimum width=3.2cm, minimum height=1cm, fill=white},
+  arrow/.style={->, thick, >=Stealth}
+]
+
+% Main top box
+\node[box, minimum width=5cm, xshift=150cm] (eth) {Ethereum Network \& Mempool};
+
+% Left side
+\node[box, below left=2cm and 4cm of eth] (consensus) {Consensus Client \\ \& Validator};
+
+% Execution (needs consensus already defined)
+\node[box, right=of consensus] (execution) {Execution Client};
+
+% Right side
+\node[whitebox, below right=1cm and 0.5cm of eth] (searchers) {Searchers (Bundles)};
+\node[whitebox, right=of searchers] (private) {Private Orderflow};
+\node[box, below=1.3cm of searchers] (builder) {Builder};
+\node[box, left=of builder] (relay) {Relay};
+
+% mev-boost (needs execution and relay to exist)
+% place it below the execution client so it's to the left of the relay
+\node[subbox, below=of execution] (mev) {mev-boost};
+
+% Connections
+\draw[arrow] (consensus) -- (eth);
+\draw[arrow] (execution) -- (consensus);
+
+\draw[arrow] (eth) -- (searchers);
+\draw[arrow] (eth) -- (private);
+\draw[arrow] (eth) -- (builder);
+
+\draw[arrow] (searchers) -- (builder);
+\draw[arrow] (private) -- (builder);
+
+\draw[arrow] (builder) -- (relay);
+\draw[arrow] (relay) -- (mev);
+
+\draw[arrow] (mev) -- (consensus);
+
+\end{tikzpicture}
