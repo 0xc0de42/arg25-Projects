@@ -1,0 +1,6 @@
+\section{Future Work}
+\label{sec:future_work}
+Future research could focus on 1) optimizing the zero-knowledge (ZK) circuit for Ethereum’s execution layer, particularly by exploring more efficient ZK schemes and specialized circuits for block validation.
+2) Further work is also required on the economic design of the protocol. Currently, a few builders dominate the block-building market~\cite{relayscan}, with Titan producing approximately 50\% of all blocks.
+The slashing incentives must be carefully designed so that the optimistic mechanism enforces effective punishment in all cases - including scenarios where a single builder controls the majority of block production — while avoiding excessively high staking requirements that could lead to centralization.
+A core challenge lies in determining the appropriate staking amount required from builders. Specifically, it is unclear what the upper limit should be for the stake relative to potential malicious gains. An important consideration is the scenario in which a builder behaves dishonestly multiple times before being detected. If the cumulative penalties or slashing events exceed the builder’s staked amount by the time all disputes are resolved, the system may fail to ensure full accountability or economic deterrence.

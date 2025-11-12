@@ -50,20 +50,20 @@ m = h(b_{i,s}) \,||\, f_{i,s} \,||\, s
 
 % Step 4 - Block submission
 \begin{gathered}[b]
-\text{Gossip } b_{i,s}
 \end{gathered}
 & 
 \tikz \draw[<-] (0,0) to ["$b_{i,s}$"] (2.3,0);
 & & & 
 \\
 
-% Step 5 - Rewards
-$f_{i,s} := r_p + r_r + r_b$
+% Step 5 - Block gossip
+\begin{gathered}[b]
+\text{Gossip } b_{i,s}
+\end{gathered}
 & 
-\tikz \draw[->] (0,0) to ["$r_r + r_b$"] (2.3,0);
-& &
-\tikz \draw[->] (0,0) to ["$r_b$"] (2.3,0);
-& 
+&
+\text{Gossip } $b'_{i,s}$
+& & 
 \\
 
 \end{tblr}

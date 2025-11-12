@@ -1,0 +1,161 @@
+% \begin{table}[h!]
+% \centering
+
+% % Rename "Table" to "Protocol" for this float
+% \renewcommand{\tablename}{Protocol}
+
+% % Resize the tblr environment for consistent width
+% \resizebox{1\textwidth}{!}{
+% \begin{tblr}{
+%     hline{1,Z} = {solid, 1pt},
+%     colspec     = { Q[c,$] c Q[c,$] c Q[c,$] },
+%     row{1-2}    = {mode=text},
+%     row{3-Z}    = {rowsep=3ex}
+% }
+
+% % Participating Entities
+% Proposer & & Builder_{j} & & PTC \\
+
+% % Step 1 - pre processing
+% $\begin{gathered}[b]
+%     PL_{i, j-1}, F_{i, j-1}
+% \end{gathered}$ 
+% & & & \\
+% \begin{gathered}[b]
+%     PL_{i,j} := PL_{i,j} \cup h(pl_{i,j-1}), \\
+%     F_{i,j} := F_{i,j} \cup f_{i,j-1}
+% \end{gathered}
+% % Step 2 - Block hash submission
+% &
+% \tikz \draw[<-] (0,0) to node[above] {$h(pl_{i,j}) \,||\, f_{i,j}$} (2.3,0);
+% &
+% $pl_{i,j}, f_{i,j}$ 
+% &
+% \\
+
+% % Step 3 - Block hash selection and signing
+% \begin{gathered}[b]
+% s = \arg\max_{b_{i,k} \in B_{i,j}} f_k \\
+% m = bb_{i}||sig_{p_i}(bb_{i})||h(pl_{i,s})||sig_{b_s}(pl_{i,s}) \,||\, f_{i,s} \,||\, s \\
+% \tikz \draw[<-] (0,0) to ["Gossip $m$"] (2.3,0);
+% \end{gathered}
+% &
+% &
+% & 
+% \\
+
+% % Step 4 - Validator Attestation
+% \text{Validators attest on } $m$ &&& \\
+
+% % Step 5 - Block hash selection and signing
+% &
+% \tikz \draw[<-] (0,0) to node[above] {$pl_{i,j} \,||\, sig(pl_{i,j})$} (2.3,0);
+% &
+% & 
+% \\
+
+% % Step 6 - Block submission
+% &&
+% $vote \in \{present, withheld, absent\}$
+% &
+% \begin{gathered}[b]
+% \tikz \draw[->] (0,0) to ["Gossip $vote$"] (2.3,0);
+% \end{gathered}
+% \\
+
+% \end{tblr}
+% } % end resizebox
+
+% \caption{ePBS}
+% \label{protocol:NIZK-PBS}
+
+% \end{table}
+
+
+
+
+
+\begin{table}[h!]
+\centering
+\renewcommand{\tablename}{Protocol}
+
+\resizebox{1\textwidth}{!}{
+\begin{tblr}{
+    colspec     = { Q[c] Q[c,$] c Q[c,$] c Q[c,$] },
+    hline{1,Z}  = {solid, 1pt},
+    row{1-2}    = {mode=text},
+    row{3-Z}    = {rowsep=3ex}
+}
+% Header
+\textbf{Time (s)} & Proposer & & Builder_{\bm{s}} & & PTC \\
+
+% --- Step 1 (0 s)
+\begin{gathered}[b]
+    \tikz \draw[->] (0,0) -- node[above] {$\forall_{v \in V} bb_{i,v} ||f_{i,v}: bb_{i,v} || h(bb_{i,v}) \,\|\, f_{i,v}$} (2.3,0);
+\end{gathered}
+&
+$\begin{gathered}[b]
+    BB_{i, j-1},\, F_{i, j-1} \\
+    BB_{i,j} := BB_{i,j} \cup h(bb_{i,j-1}),\\
+    F_{i,j} := F_{i,j} \cup f_{i,j-1}
+\end{gathered}$ & 
+& 
+& & \\
+\textbf{0} & & & & \\
+
+% --- Step 2 (3 s)
+&
+\begin{gathered}
+    $ m := bb'_{i} || h(bb_{i}) || f_{i,s} || s$ s.t. $f_{i,s} \in F_{i,j} \land  f_{i,s} \geq \forall_{f \in F_{i,j}} f$ \\
+    \tikz \draw[<->] (0,0) -- node[above] {Gossip $m || sig_{v_s}(m)$} (2.3,0);
+\end{gathered}
+
+& & & & \\
+
+% --- Step 3 (6 s)
+\textbf{3}  &
+\begin{gathered}[b]
+\text{Validators attest on } $m$ \\
+$\forall_{v \in V} VerSig_{v_s}(m, sig(m)) \land h(bb'_{i}) == h(bb_{i})$ \\
+\end{gathered}
+&
+& & & \\
+
+% --- Step 4 (6 s)
+\textbf{6} &
+&
+&
+\tikz \draw[<->] (0,0) -- node[above] {Gossip $pl_{i,s}\,\|\,\mathrm{sig}(pl_{i,s})$} (2.3,0);
+& & \\
+
+% --- Step 5 (9 s)
+\textbf{9} &&&
+&&
+\begin{gathered}
+$vote \in \{\text{present},\,\text{withheld},\,\text{absent}\}$ \\
+\tikz \draw[<->] (0,0) -- node[above] {$\forall_{v \in PTC_i}$ Gossip $vote_{i, v}$} (2.3,0);
+\end{gathered}
+\\
+
+% --- Step 6 (12 s)
+\textbf{12} & & 
+Consensus on $ block_i = (bb_{i} || (pl_{i,s} |EmptyPayload)) | EmptyBlock$
+& & & \\
+\end{tblr}
+} % end resizebox
+
+% --- dashed timeline connection (overlay)
+\begin{tikzpicture}[remember picture, overlay]
+% locate each time value vertically
+\node (t0) at ([xshift=-5mm,yshift=-1mm]current bounding box.north west) {};
+\node (t3) at ([xshift=-5mm,yshift=-12mm]current bounding box.north west) {};
+\node (t6) at ([xshift=-5mm,yshift=-24mm]current bounding box.north west) {};
+\node (t9) at ([xshift=-5mm,yshift=-36mm]current bounding box.north west) {};
+\node (t12) at ([xshift=-5mm,yshift=-48mm]current bounding box.north west) {};
+% draw vertical dashed line
+\draw[dashed, thick] (t0) -- (t12);
+\end{tikzpicture}
+
+\caption{ePBS}
+\label{protocol:ePBS}
+\end{table}

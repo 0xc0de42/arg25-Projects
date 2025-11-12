@@ -1,0 +1,33 @@
+\begin{table}[h!]
+\centering
+\renewcommand{\tablename}{Protocol}
+
+\resizebox{1\textwidth}{!}{
+\begin{tblr}{
+    colspec     = { Q[l] Q[c,$] c Q[c,$] c Q[c,$] },
+    hline{1,Z}  = {solid, 1pt},
+    row{1-2}    = {mode=text},
+    row{3-Z}    = {rowsep=3ex}
+}
+\textbf{Time} & \textbf{Proposer} & & \textbf{Builder} & & \textbf{ILC} \\
+
+\textbf{Slot N, 0 s} & & & & & \\
+& & & & & \tikz \draw[<->] (0,0) -- node[above] {$\forall_{v \in ILC} $ Build and Gossip $IL_v$} (2.3,0);\\
+\textbf{Slot N, 8 s} & & & & & \\
+\textbf{Slot N, 9 s} Validators store gossiped $IL_v$, then freeze $IL$ & & & & & \\
+\textbf{Slot N, 11 s} & & &
+\tikz \draw[<->] (0,0) -- node[above] {Gossip $pl_{N,j}$} (2.3,0);
+& & \\
+\textbf{Slot N+1, 0 s} & 
+\begin{gathered}
+    $ m := bb'_{i} || h(bb_{i}) || f_{i,s} || s$ s.t. $f_{i,s} \in F_{i,j} \land  f_{i,s} \geq \forall_{f \in F_{i,j}} f$ \\
+    \tikz \draw[<->] (0,0) -- node[above] {Gossip $m || sig_{v_s}(m)$} (2.3,0);
+\end{gathered}
+& & & & \\
+
+\end{tblr}
+} % end resizebox
+
+\caption{FOCIL (EIP-7805) - Protocol Diagram. ePBS with Focil}
+\label{protocol:FOCIL-empty}
+\end{table}

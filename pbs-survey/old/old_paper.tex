@@ -1,0 +1,361 @@
+% \documentclass[11pt]{article}
+% \usepackage{amsmath,amsfonts,amssymb}
+% \usepackage{hyperref}
+% \usepackage{tikz}
+% \usepackage{tabularray}
+% \usepackage{bm}
+% \usetikzlibrary{quotes}
+% \UseTblrLibrary{amsmath}
+% \usetikzlibrary{arrows.meta, positioning}
+
+% \title{ZK PBS – Extending Trustlessness Beyond the Realms of Consensus}
+% \author{Gil Henkin}
+% \date{31.10.2025}
+
+% \begin{document}
+
+% \maketitle
+
+% \begin{abstract}
+% Proposer-Builder Separation (PBS) has emerged as a key design to democratize block construction and mitigate MEV centralization.  In Ethereum’s MEV-Boost era, validators outsource block building to specialized relays and builders.  However, the reliance on trusted relays and cleartext block proposals introduces a new trust assumption and centralization risks.
+% We propose an \emph{Optimistic Zero-Knowledge PBS (ZK PBS)} architecture in which block builders commit to a proposed block via its header and a succinct zero-knowledge proof.  This approach allows the proposer to validate that a block is correct and the promised bid will be paid, validation happens only when needed.  We detail a system design with distinct roles (Proposer, Builder, Prover, Verifier and a Challenger) and a two stage protocol to prove and verify blocks securely.  We present a ZK construction for the block validity statement for generating and verifying proofs. The ONIZK PBS protocol preserves proposer-builder trustlessness, and enforces proposer-builder honesty.  We discuss performance trade-offs, potential limitations, and directions for future work. 
+% \end{abstract}
+
+% \section{Introduction}
+% In proof-of-stake Ethereum, validators (proposers) receive on-chain rewards for proposing blocks, but can earn significantly more by exploiting Maximal Extractable Value (MEV) from transaction ordering.  To distribute MEV opportunities, Ethereum adopted Proposer-Builder Separation (PBS) via the MEV-Boost relay system.  In MEV-Boost, validators outsource block construction to off-chain \emph{builders}  through relays who assemble high-value blocks, submit a sealed bid, and then deliver the full block after the proposer commits.  This separation flattens the playing field among validators: proposers no longer need to run sophisticated builder algorithms, and instead accept the highest bid without seeing the transactions.  However, the current PBS ecosystem introduces new trust and centralization issues.
+
+% Today, a small number of relays deliver the majority of blocks, creating a central point of failure.  Builders must trust relays not to censor or steal blocks, and proposers must trust that builders will honor bids after the block is committed.  Several recent works and proposals (e.g. EIP-7732) aim to enshrine PBS in-protocol with  [TODO probably has communication overhead] elaborate on the ePBS approach commitments and slashing rules.  We propose leveraging zero-knowledge (ZK) proofs in an optimistic way to make PBS trustless and efficient (when participants are honest verification is not needed): proposers commit to blocks using ZK proofs of validity. 
+
+% \subsection{Paper Map}
+
+% This paper introduces an \emph{Optimistic Zero-Knowledge PBS (ZK-PBS)} framework for trustless block production. \hyperref[sec:mev]{Section~II} reviews MEV and existing PBS mechanisms; \hyperref[sec:problem]{Section~III} formalizes current trust and centralization challenges; and \hyperref[sec:architecture]{Section~IV} presents our two-stage zk-optimistic protocol—an efficient non-interactive exchange followed by dispute-triggered verification. The proof construction is detailed in \hyperref[sec:proving_blocks]{V}, broader implications and future directions in Sections \hyperref[sec:disscusion]{VI}–\hyperref[sec:future_work]{VII}. Together, these sections outline a minimal-verification, high-throughput PBS achieving full cryptoeconomic accountability.
+
+
+% \section{Background and Related Work}
+% This section introduces the core cryptographic building blocks used in our protocol, including commitment schemes, ZKPs and a survey of previous PBS approaches as well as possible attacks.
+% Table ~\ref{table:work_terminology} defines the notations used throughout the paper.
+
+% \input{work-terminology}
+
+% [TODO] Add Mathematical definitions here - probably ZK schemes, hash schemes and other needed primitives.
+
+% \subsection{MEV and MEV-Boost}
+% \label{sec:mev}
+% Maximal Extractable Value (MEV) refers to the extra gains block proposers or extract by reordering or including special transactions beyond base fees. In Proof-of-Stake (PoS) Ethereum, validators seek MEV by constructing blocks containing arbitrage, liquidation, and sandwich transactions. To level the field, PBS was introduced: flashbots’ MEV-Boost allows validators to outsource block building to specialized builders via relays. Validators register interested relays and pass along builder proposals. This opens competition: over 90\% of Ethereum validators now use MEV-Boost to bid out blockspace.
+
+% \subsection{Proposer-Builder Separation (PBS)}
+% PBS separates the roles of \emph{building} a block (assembling transactions for maximal revenue) from \emph{proposing} it to the consensus layer.  Intuitively, block-building benefits from private information and computation. Under PBS, builders produce candidate blocks and offer to pay the proposer for their block’s inclusion. The proposer accepts the highest bid among builders, then signs its header and publishes it. Conceptually, PBS aims to delegate MEV advantages to the \textit{builder} side, so validators (proposers) simply ensure validity without needing the same MEV strategies. In the context of two entities - builder and proposer there are a few attacks that each of the party can leverage to exploit in the simple naive communication between the two parties.
+
+% \subsection{Types of Different Attacks}
+% \label{subsection:types-of-different-attack}
+% In this subsection we list the problem of the naive setup - a system that is comprised of a proposer and a builder only (this is not a PBS design but rather the "naive" approach).
+
+% When one is observing PBS (as it is presented and working today) from the prescriptive of Ethereum's philosophy and decentralization mind set, it is an inherently wrong approach, thus it is interesting to observe the problem in the naive setup so that we can address the root problems, instead of patching the patch. Below we list the attacks:
+
+% \noindent\textbf{Running Away with Fees}\\[4pt]
+% Proposer can run away with fee rewards as soon the block is known to him - by gossiping the block and collecting all the reward to himself without sharing with other participants. 
+% \\[8pt]
+% \noindent\textbf{Block Augmentation}\\[4pt]
+% Proposer can augment and modify the block to his own advantage by reordering the transactions or adding/removing transaction according to his own benefit to increase his own personal MEV (and not builders).
+% \\[8pt]
+% \noindent\textbf{Block Delay}\\[4pt]
+% Block builder can claim that he has the block with the largest MEV and delay block transmition at once the proposer selects the block exahusting proposer slot time and straving the proposer such that he will not get nor block fees neither MEV.
+% \\[8pt]
+% \noindent\textbf{Lying}\\[4pt]
+% There are two main challenges when it comes to fraud detection in this context. The first is to detect whether somebody is lying in this chain of communication, starting from the builder all the way to prosper, and the second problem is to detect who is lying and slash him accordingly.
+
+% The most simplest solution would involve economic incentives where the proposer and the builder would stake in order to participate in the protocol.
+% \\[8pt]
+% \noindent\textbf{Stealing Blocks}\\[4pt]
+% Relays can steal builders block since they are fully exposed to block's content.
+
+% \subsection{Naive Approach}
+% \input{naive-pbs-protocol.tex}
+% ~\ref{protocol:naive_proposer_builder_separation} presents a naive variant of a PBS protocol, it does not try to prevent any attacks listed in ~\ref{subsection:types-of-different-attack}, but rather presents a baseline. This protocol assumes full honest participation of both parties.
+
+% The flow of the protocol is as such:
+% \\[8pt]
+% \noindent\textbf{Step 0} The proposer aggregates proposed block candidates for slot $i$ of all builders so far.
+% \\[8pt]
+% \noindent\textbf{Step 1} Once builder $j$ evaluates a candidate, he submits $h(b_{i,j})$ - hash of the block candidate, to the proposer and the promised fee $f_{i,j}$. The proposer of slot $i$ aggregates the header.
+% \\[8pt]
+% \noindent\textbf{Step 2} The proposer selects a block candidate by signing on the corresponding block header and submits it as a request to the builder. 
+% \\[8pt]
+% \noindent\textbf{Step 3} The relay receives the proposer's selected header and response with block's payload $b_{i,j}$.
+% \\[8pt]
+
+% \noindent\textbf{Step 4} The proposer receives the selected block payload $b_{i,j}$, validates it, and gossips the block.
+% Fees are embedded as a transaction within the block, rewarding the proposer, and validator once the block is finalized.
+% The builder co-gossips the same block (signed by the proposer) to prevent any modification.
+
+% If the proposer attempts to broadcast an altered payload $b'{i,j}$, the builder can prove equivocation by publishing the originally signed $b{i,j}$, since both share the proposer’s signature but differ in hash.
+% This results in a fork at slot $i$ and triggers proposer slashing for producing two conflicting blocks.
+% Because the proposer signs only the hash $h(b_{i,j})$ before receiving the payload, the builder’s co-gossip guarantees immutability: any divergence between $b_{i,j}$ and $b'_{i,j}$ is cryptographically verifiable and punishable.
+
+
+% \subsection{PBS}
+% Despite its benefits, current PBS/MEV-Boost is heavily based on trust assumptions. Proposers commit to a block only knowing that the block is valid and the payment amount, not the inside transactions. This eliminates the need to trust builders about ordering, but it still assumes that relays and builders behave correctly.  In practice, a handful of relays deliver $\approx$90\% of the blocks, introducing a centralization point. Moreover, a builder may behave maliciously: for example, a builder might bid to win a slot and then fail to deliver the block (preventing the proposer to provide a valid block, and thus prevent the proposer to receive reward and potential MEV).  In contrast, a relay might attempt to steal MEV by revealing or reassembling the block out of band. As illustrated in Figure~\ref{fig:mev-boost-orderflow}, MEV-Boost orderflow connects searchers, builders, relays, and proposers through an external auction mechanism.
+
+% \begin{figure}[h!]
+%     \makebox[\textwidth][c]{%
+%         \input{mev-boost-orderflow.tex}%
+%     }
+%     \label{fig:mev-boost-orderflow}
+%     \caption{MEV-Boost Orderflow.}
+% \end{figure}
+
+
+% Several proposals have been made to address these issues.  One avenue is encryption and fraud proofs. For instance, builders could encrypt blocks to the proposer’s key so the relay cannot inspect them; fraud proofs can enable punishment if the builder withholds the block. Trusted Execution Environments (TEEs) have also been proposed (so-called TEE-Boost) to prove block validity to the proposer without revealing content. More recently, threshold encryption (encrypting to an attestation committee) has been shown to allow instant private block delivery once enough attestations accumulate. 
+% \\[16pt]
+% \input{pbs-protocol.tex}
+
+% \subsubsection{PBS Protocol}
+% Protocol ~\ref{protocol:relay_block_submission} presents today's version of PBS after the introduction of MEV-boost. In the protocol diagram, we combined the relay and the mev-boost entities into a single entity (for simplicity), a more detailed version of the diagram can be seen \cite{flashbots_mev_boost_architecture}.
+% We focus on the high level design of block selection and assume that each block proposal happens after the registration phase.
+
+% In the protocol is comprised of 3 entities:
+% \begin{description}
+%     \item[Proposer] Is a validator that is assign to propose a block at time $i$.
+%     \item[Relay] Is also a validator and is also staked.
+%     \item[Builder] Is selected by the proposer according to the reward fee that he guranties to the proposer, the builder is not staked in PBS protocol.
+% \end{description}
+
+% The flow of the protocol is as such:
+% \\[8pt]
+% \noindent\textbf{Step 0} The relay aggregates proposed block candidates for slot $i$ of all builders so far.
+% \\[8pt]
+% \noindent\textbf{Step 1} Once builder $j$ evaluates a candidate, he submits to the relay, the candidate block $b_{i,j}$ and the promised fee $f_{i,j}$. The relay adds the new candidate to the collection and submits block header ($h(b_{i,j})$ - hash of the block candidate) and the promised fee $f_{i,j}$ to the designated block proposer of slot $i$.
+% \\[8pt]
+% \noindent\textbf{Step 2} The proposer selects a block candidate by signing on the corresponding block header and submits it as a request to the relay. 
+% \\[8pt]
+% \noindent\textbf{Step 3} The relay receives the proposer's selected header and response with block's payload $b_{i,j}$.
+% \\[8pt]
+% \noindent\textbf{Step 4} The proposer receives the selected block payload $b_{i,j}$, validates it, and gossips the block.
+% Fees are embedded as a transaction within the block, rewarding the proposer, relay, and validator once the block is finalized.
+% The relay co-gossips the same block (signed by the proposer) to prevent any modification.
+
+% If the proposer attempts to broadcast an altered payload $b'{i,j}$, the relay can prove equivocation by publishing the originally signed $b{i,j}$, since both share the proposer’s signature but differ in hash.
+% This results in a fork at slot $i$ and triggers proposer slashing for producing two conflicting blocks.
+% Because the proposer signs only the hash $h(b_{i,j})$ before receiving the payload, the relay’s co-gossip guarantees immutability: any divergence between $b_{i,j}$ and $b'_{i,j}$ is cryptographically verifiable and punishable.
+
+% \subsubsection{What exploits does PBS solve?}
+% Proposer-Builder Separation (PBS) is designed to mitigate several classes of manipulation and centralization risks that arise during block construction and propagation, such as those discussed in Section~\ref{subsection:types-of-different-attack}. Below we present the defense mechanisms that PBS introduce in order to deal with trust issue in the communication between proposers and builder communication.
+
+
+% \subsection{ePBS}
+% Ethereum’s enshrined proposer-builder separation (ePBS) represents the ongoing effort to integrate the previously off-chain builder–proposer market directly into the consensus layer. The mechanism aims to preserve the decentralization and censorship-resistance of block production while formalizing the separation of responsibilities between builders, who construct optimized blocks, and proposers, who select and include them on-chain. ePBS introduces protocol-native commitments, bids, and cryptographic attestations to replace the current trust assumptions in MEV-Boost relays with verifiable guarantees. This shift is central to Ethereum’s roadmap for reducing centralization pressures, improving transparency in MEV extraction, and establishing a secure, in-protocol marketplace for block construction.  As illustrated in ~\ref{fig:epbs-mev-boost-orderflow}, the ePBS orderflow connects searchers, builders and proposers through without the need for an external auction mechanism; eliminating completely the relay and mev-boost that PBS dependened on, see ~\ref{fig:mev-boost-orderflow}.
+
+
+% \begin{figure}[h!]
+%     \makebox[\textwidth][c]{%
+%         \input{epbs-mev-boost-orderflow.tex}%
+%     }
+%     \label{fig:epbs-mev-boost-orderflow}
+%     \caption{ePBS Orderflow.}
+% \end{figure}
+
+
+% Facts about ePBS:
+% \begin{description}
+%     \item[Builders:] these are validators that submit bids to proposers to commit them to a specific execution payload. Additionally, just like proposers, builders have to stake.
+%     \item[PTC:] This is a new committee that attest for the timely presence (and validity) of the builder's payload. The committee consists of 512 validators. The PTC vote for the timelines and validity of builder payload, where more then $2/3$ commitee members have to vote for the block, thus a player that controls more then $35\%$ of the stake.
+    
+%     then $1/3$ of the commitee members can 
+
+%     The expected time for a malicious attacker, controlling $35\%$ of the total stake, to have a majority control on the PTC is 205 000 years.
+%     \item[Proposer] is guaranteed to be paid unconditionally.
+% \end{description}
+
+
+% The Payload Timeliness Committee members do not need to validate the execution payload before attesting to it. They perform basic checks such as verifying the builder’s signature, and the correct blockhash is included. This takes away the full execution payload validation from the hot path of validation of an Ethereum block, giving the next proposer 6 seconds $(SECONDS-PER-SLOT * 2 // INTERVALS-PER-SLOT)$ to validate the payload and every other validator 9 seconds $(SECONDS-PER-SLOT * 3 // INTERVALS-PER-SLOT)$. From a user UX perspective, a transaction included in slot $N$ by the builder is not widely validated until the proposer of slot $N+1$ releases their beacon block on top of block $N$ first and the attesters of slot $N+1$ vote on this beacon block as the head of the chain, according to EIP-7732 specification~\cite{eip_7732_epbs}.
+
+% The ePBS removes the relay and the mev-boost, instead it introduces Payload Timeliness Committee (PTC).
+% In ePBS BeaconBlock and block's Payload are separated.
+
+% \subsubsection{ePBS Protocol}
+% We present the ePBS protocol flow as explained in \cite{potuz_anatomy_slot}.
+
+% [TODO] Describe roles
+% There are three entitis in the ePBS protocol:
+% \begin{itemize}
+%     \item \textbf{Builder:}
+%     \item \textbf{Proposer:}
+%     \item \textbf{PTC validator:}
+% \end{itemize}
+
+
+% [TODO] Seperate IL from ePBS, create a step by step explanation of the IL-PBS protocol at focil subsection.
+% The proposer requests an inclusion list from its EL and broadcasts it if he hasn't done so already. Create a steps diagram for ePBS IL version, where the PTC is used for IL. Steps 2,3 
+
+% \input{epbs-protocol}
+% \\[8pt]
+% \noindent\textbf{Second 0} The proposer assigned for that slot prepares and broadcasts a SignedBeaconBlock. In order to do so they first need to select a builder's bid and include the corresponding SignedExecutionPayloadHeader in their beacon block.
+
+% \\[8pt]
+% \noindent\textbf{Between 0 and 3s} The network has already gossiped the SignedBeaconBlock and the InclusionList. Validators will verify the proposer's signature of the SignedInclusionListSummary and forward the full inclusion list for the EL to validate. Validators independently run the state transition function on the consensus block to validate it.
+
+% \noindent\textbf{Between 3 and 6} As soon as the validators have validated both consensus block and [TODO add to IL-PBS explanation] inclusion list, validators attest for the presence of the corresponding beacon block and inclusion list. Validation of this block is fast at pre-merge times given that there is no execution to validate at this time of the slot. Propagation is also faster given that there are no blobs to be required at this stage and the block itself is lighter without the execution payload.
+
+% There is no new requirement for validators in what attestations are concerned.
+
+% \noindent\textbf{Between 6s and 9s} Two things happen at the same time at half the slot time.
+
+% \begin{itemize}
+%   \item Aggregators listening to their subnets aggregate and submit attestation aggregates.
+%   \item Builders broadcast their execution payload.
+% \end{itemize}
+
+% Nothing changes for aggregators except the tighter deadline from 8 seconds to 6 seconds.
+
+% Builders on the other hand have been watching all subnets and by 6 seconds should have a clear idea if the consensus layer block has been seen by a large portion of the network.
+% Builders send their execution payload as an SignedExecutionPayloadEnvelope object
+
+
+
+% \noindent\textbf{Between 9s and 12s}
+% Every slot, 512 validators are chosen to be part of a payload timeliness committee (PTC). Those validators attest, at 9 seconds into the slot if they have seen the expected execution payload timely. This committee can vote in three different ways
+
+% \begin{itemize}
+%   \item If they have seen a consensus block for the current slot and the corresponding payload was seen timely with $payload\_withheld = \mathrm{False}$ in the envelope, they vote $PAYLOAD\_PRESENT$.
+%   \item If they have seen a consensus block for the current slot and the corresponding payload was seen timely with $payload\_withheld = True$ in the envelope, they vote $PAYLOAD\_WITHHELD$.
+%   \item If they have not seen any consensus block in the current slot, of if they have seen one but the corresponding payload was not seen they vote $PAYLOAD\_ABSENT$.
+% \end{itemize}
+    
+% These attestations are gossiped on a global topic.
+
+% \noindent\textbf{Step 5, At 12s}
+% By the end of the slot, validators have thus imported and validated an inclusion list, a consensus block, single bit attestations and aggregated attestations, payload attestations and a full execution payload. They can evaluate the new head of the blockchain. This can now be either of the three options:
+
+% \begin{itemize}
+%     \item A full block, that is both the consensus block and the corresponding execution payload have been imported.
+%     \item An empty block, that is the consensus block was imported, but the execution payload was not revealed on time.
+%     \item A skipped slot, that is when the consensus block was imported.
+% \end{itemize}
+
+% \subsubsection{Fork-choice enforced Inclusion Lists}
+% As discussed in \cite{eip_7805_focil}, FOCIL (Fork-choice enforced Inclusion Lists) implements a robust mechanism to preserve Ethereum’s censorship resistance properties by guaranteeing timely transaction inclusion. 
+
+% When validators receive inclusion lists (ILs) from the P2P network, they perform a series of validation checks before forwarding or caching them. These rules protect against Denial-of-Service attacks by (1) limiting ILs’ byte size and (2) restricting IL proposals to a small committee of IL committee members, thereby tightly bounding bandwidth, the main resource consumed by the propagation of ILs. Consumption of other relevant resources, such as verification time, is minimal because the only nontrivial check performed on IL propagation is signature verification. At this stage, there is no EL verification of the transactions within ILs. This means that ILs are allowed to contain any transactions—valid or invalid—since validators do not perform EL-side validity checks. This design choice is intended to avoid additional computational overhead.
+
+% [TODO] Write IL-ePBS steps use ePBS as a reference mention the extenstions and addition that are required to support IL-ePBS.
+
+% \section{Problem Statement}
+% \label{sec:problem}
+% Current PBS (via MEV-Boost) improves proposer's equality but introduces new trust. Specifically:
+% \begin{itemize}
+%     \item \textbf{Relay Trust Centralization:} A few relay servers act as gatekeepers between builders and proposers. Builders must trust relays not to censor blocks or steal payloads; proposers must trust relays to provide the promised block. This concentration of trust subverts decentralization.
+%     \item \textbf{Builder-Proposer Trust:} After a proposer signs a builder’s header, the builder is supposed to deliver the full block. A malicious builder could withhold or delay the block (griefing the proposer and wasting its slot). Conversely, if a proposer could see the block before signing, it could steal the MEV by not publishing or by re-proposing an empty slot. MEV-Boost’s design disallows the former, but a cryptographically enforced solution is desirable.
+%     \item \textbf{Economic Guarantee:} In MEV-Boost, a builder commits to pay a bid to the proposer, but proving that the block \emph{indeed} pays that bid (e.g. via included fee transactions or a bonded deposit) requires trusting that the builder will honor it. Ideally, the system should ensure the bid is actually covered by the block’s contents in a verifiable way.
+%     \item \textbf{Centralizing Incentives:} As shown by, heterogeneity in block production can lead to concentration among top builders, even under PBS. If only the largest builders reliably win auctions, power can centralize in those entities, such entities can delay and censor transactions according to their desire. A fully trustless PBS should not worsen this trend and might even mitigate it by lowering entry barriers (as more and more builders will be able to join the protocol and build blocks, by lowering the trust entry barrier).
+% \end{itemize}
+% To summarize, a trustless PBS would enable proposers to (a) obtain assurance that the block they are purchasing is valid and finalizable, and (b) verify that the corresponding payment will be executed as promised. Our approach addresses these challenges through optimistic zero-knowledge proofs, which replace the need for trusted intermediaries such as relays and builders with cryptographic verification.
+
+% \section{System Design and Architecture}
+% \label{sec:architecture}
+% We propose the following architecture two staged design with five principal roles. Some entities might take a few roles in the same protocol round, but we describe them conceptually:
+
+% \subsection{Roles}
+% \begin{itemize}
+%     \item \textbf{Block Builder:} The specialized party that assembles transaction payloads into a block $b_{i,j}$ for slot $i$, by builder $j$, including calculating state transitions. The Block Builder also computes and aggregates the block header $\pi(b_{i,j})||h(b_{i,j})||f_{i,j}$. 
+%     \item \textbf{Prover:} A cryptographic engine (which may be part of the Block Builder’s infrastructure, a different microservice or an out sourced service) that generates a zero-knowledge proof $\pi(b_{i,j})$ attesting to the correctness of block $b_{i,j}$. Specifically, the proof encodes statements like - $b_{i,j}$ extends the prior canonical state, $h(b_{i,j})$ correctly commits to $b_{i,j}$ and the block’s fees cover the bid, see ~\ref{sec:proving_blocks} for more details on proof structure.
+%     \item \textbf{Verifier:} 
+%     [TODO] Understand where validation should happen??
+%     A smart contract deployed on Ethereum that verifies the proof $\pi(b_i)$. It runs $\mathsf{Ver}(\pi(b_{i,s}), b_{i,s}||h(b_{i,s})||f_{i,s})$ to confirm the block meets all protocol rules. If verification succeeds, the block is considered valid.
+%     The verification should be activated only one or more of the participants didn't followed the honest protocol. It is expected that the proofs will not be evaluated most of the time.
+
+%     \item \textbf{Challenger:} This role can be fullfill by several entities - proposer, builder, verifier and other entities that are not directly participating in the first stage of the protocol.
+%     \item \textbf{Proposer (Validator):} The PoS block proposer who selects among competing bids. The Proposer receives blocks annd block headers in real time of all the builder that he decieds to subscribe to $|B|$ and, after at slot time, chooses the best offer. The proposer then signs the block and gossips this endorsement.
+% \end{itemize}
+
+% \subsection{Approach}
+% \label{sec:approach}
+
+% Our design follows a two-stage \textit{zk-optimistic} approach that decouples the economic and cryptographic responsibilities within proposer–builder separation (PBS). The key idea is that block validation is deferred and executed only in case of dispute, while normal-case operation remains fully optimistic and lightweight. This enables high throughput during standard block production without compromising verifiability or integrity in adversarial scenarios.
+
+% \input{zk-pbs-protocol}
+
+% \paragraph{Stage 1: Optimistic Block Exchange.}
+% In the first stage, shown in \textbf{Protocol ~\ref{protocol:NIZK-PBS}}, the proposer and the builder interact through an optimistic pipeline. Builders submit candidate blocks $\{b_{i,j}\}$ with associated fees $\{f_{i,j}\}$, and the proposer selects the candidate maximizing fee contribution:
+% \[
+% s = \arg\max_{b_{i,k} \in B_{i,j}} f_k
+% \]
+% The proposer then commits to the winning block by signing a succinct message
+% $m = h(b_{i,s}) \Vert f_{i,s} \Vert s$,
+% which serves as both a commitment and a payment claim. The block is then gossiped through the network and temporarily accepted as valid without on-chain verification. Because no zero-knowledge verification is executed at this point, the system maintains near-native throughput comparable to naive PBS. The only downside in such a design in terms of performance is the latency that is introduced by the prover. We save a lot on networking (even compared to the naive approach, that requires 2 rounds of communication) since this is a non-interactive protocol and each builders emits his best offer as soon as the block is built directly to the proposer. The proposer also benefits from atomicity, since the block is emitted directly the header and payload - such desing prevents the builder to exploit slot time window and delay blocks, see ~\ref{subsection:types-of-different-attack}.
+
+% \paragraph{Stage 2: Dispute-Triggered Validation.}
+% The second stage is invoked only upon challenge or inconsistency detection—when a proposer or peer disputes the validity of the block header, payload, or fee accounting. In this fallback path, a challenger invokes verification smart contract to attest that a certain block proof, with block hash, fee and payload fails.
+
+% \[
+% \mathsf{Verify}(vk,\, \pi(b_{i,s}),\, h(b_{i,s}) || f_{i,s} || b_{i,s}) = 0
+% \]
+
+% In such a case, the builder will be slashed and the proposer would be compensated accordingly.
+% Thus, the protocol achieves trustless validation without redundant verification overhead in the optimistic path.
+
+% \input{zk-pbs-protocol-dispute.tex}
+
+
+% \paragraph{Rationale.}
+% This two-stage design unifies the efficiency of optimistic approach with the accountability of zero-knowledge proofs. Rather than continuously verifying every block during slot time, we verify only upon dispute—achieving efficiency while preserving verifiability. It thereby creates a cryptoeconomic equilibrium in which honest behavior is the cheapest strategy and verification is avoided unless needed.
+
+% \section{Proving Blocks}
+% \label{sec:proving_blocks}
+
+% In this section we focus on proving and verifying block building, we will present rigorous mathematical proofs for completeness and soundness of the protocol by proving existents of a simulator for the protocol, as well as we will survey potential ZK schemes to find the most optimal proving scheme for our use case.
+
+% \subsection{Completeness}
+% \subsection{Soundness}
+% \subsection{Simulator}
+% \subsection{Proving schemes}
+
+% \section{Discussion}
+% \label{sec:disscusion}
+
+% End game? Or End of it?
+% Will MEV kill Ethereum - or will Ethereum overcome its centralization bottlenecks and continue to push back against builders seeking to capitalize on its infrastructure and users?
+
+% This work aims to foster a broader and more competitive market of block builders, driving block-building margins down so that Ethereum’s users can benefit from a fairer, more transparent, and decentralized infrastructure.
+
+% [TODO] Current the proposer preference for MEv is one dimensional, and we can create multidimenstional vector of the policy accroding to whih the proposer chooses a new block from the builders, which in turn creates a niche market for local mempool, by creating inclusion list per proposer according.
+
+% \section{Future Work}
+% \label{sec:future_work}
+% Future research could focus on 1) optimizing the zero-knowledge (ZK) circuit for Ethereum’s execution layer, particularly by exploring more efficient ZK schemes and specialized circuits for block validation.
+% 2) Further work is also required on the economic design of the protocol. Currently, a few builders dominate the block-building market~\cite{relayscan}, with Titan producing approximately 50\% of all blocks.
+% The slashing incentives must be carefully designed so that the optimistic mechanism enforces effective punishment in all cases - including scenarios where a single builder controls the majority of block production — while avoiding excessively high staking requirements that could lead to centralization.
+% A core challenge lies in determining the appropriate staking amount required from builders. Specifically, it is unclear what the upper limit should be for the stake relative to potential malicious gains. An important consideration is the scenario in which a builder behaves dishonestly multiple times before being detected. If the cumulative penalties or slashing events exceed the builder’s staked amount by the time all disputes are resolved, the system may fail to ensure full accountability or economic deterrence.
+
+% \newpage
+% \bibliographystyle{ieeetr}
+% \bibliography{references}
+
+% \end{document}
+\documentclass[11pt]{article}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{tabularray}
+\usepackage{bm}
+\usetikzlibrary{quotes}
+\UseTblrLibrary{amsmath}
+\usetikzlibrary{arrows.meta, positioning}
+
+\title{PBS Survey}
+\author{Gil Henkin}
+\date{31.10.2025}
+\begin{document}
+
+\input{sections/00-frontmatter.tex}
+\include{sections/01-section-introduction.tex}
+\include{sections/02-section-background-and-related-work.tex}
+% \include{sections/03-section-problem-statement.tex}
+% \include{sections/04-section-system-design-and-architecture.tex}
+% \include{sections/05-section-proving-blocks.tex}
+\include{sections/06-section-discussion.tex}
+% \include{sections/07-section-future-work.tex}
+
+\newpage
+\bibliographystyle{ieeetr}
+\bibliography{references}
+\end{document}

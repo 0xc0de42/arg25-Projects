@@ -1,0 +1,48 @@
+\section{System Design and Architecture}
+\label{sec:architecture}
+We propose the following architecture two staged design with five principal roles. Some entities might take a few roles in the same protocol round, but we describe them conceptually:
+
+\subsection{Roles}
+\begin{itemize}
+    \item \textbf{Block Builder:} The specialized party that assembles transaction payloads into a block $b_{i,j}$ for slot $i$, by builder $j$, including calculating state transitions. The Block Builder also computes and aggregates the block header $\pi(b_{i,j})||h(b_{i,j})||f_{i,j}$. 
+    \item \textbf{Prover:} A cryptographic engine (which may be part of the Block Builder’s infrastructure, a different microservice or an out sourced service) that generates a zero-knowledge proof $\pi(b_{i,j})$ attesting to the correctness of block $b_{i,j}$. Specifically, the proof encodes statements like - $b_{i,j}$ extends the prior canonical state, $h(b_{i,j})$ correctly commits to $b_{i,j}$ and the block’s fees cover the bid, see ~\ref{sec:proving_blocks} for more details on proof structure.
+    \item \textbf{Verifier:} 
+    [TODO] Understand where validation should happen??
+    A smart contract deployed on Ethereum that verifies the proof $\pi(b_i)$. It runs $\mathsf{Ver}(\pi(b_{i,s}), b_{i,s}||h(b_{i,s})||f_{i,s})$ to confirm the block meets all protocol rules. If verification succeeds, the block is considered valid.
+    The verification should be activated only one or more of the participants didn't followed the honest protocol. It is expected that the proofs will not be evaluated most of the time.
+
+    \item \textbf{Challenger:} This role can be fullfill by several entities - proposer, builder, verifier and other entities that are not directly participating in the first stage of the protocol.
+    \item \textbf{Proposer (Validator):} The PoS block proposer who selects among competing bids. The Proposer receives blocks annd block headers in real time of all the builder that he decieds to subscribe to $|B|$ and, after at slot time, chooses the best offer. The proposer then signs the block and gossips this endorsement.
+\end{itemize}
+
+\subsection{Approach}
+\label{sec:approach}
+
+Our design follows a two-stage \textit{zk-optimistic} approach that decouples the economic and cryptographic responsibilities within proposer–builder separation (PBS). The key idea is that block validation is deferred and executed only in case of dispute, while normal-case operation remains fully optimistic and lightweight. This enables high throughput during standard block production without compromising verifiability or integrity in adversarial scenarios.
+
+\input{zk-pbs-protocol}
+
+\paragraph{Stage 1: Optimistic Block Exchange.}
+In the first stage, shown in \textbf{Protocol ~\ref{protocol:NIZK-PBS}}, the proposer and the builder interact through an optimistic pipeline. Builders submit candidate blocks $\{b_{i,j}\}$ with associated fees $\{f_{i,j}\}$, and the proposer selects the candidate maximizing fee contribution:
+\[
+s = \arg\max_{b_{i,k} \in B_{i,j}} f_k
+\]
+The proposer then commits to the winning block by signing a succinct message
+$m = h(b_{i,s}) \Vert f_{i,s} \Vert s$,
+which serves as both a commitment and a payment claim. The block is then gossiped through the network and temporarily accepted as valid without on-chain verification. Because no zero-knowledge verification is executed at this point, the system maintains near-native throughput comparable to naive PBS. The only downside in such a design in terms of performance is the latency that is introduced by the prover. We save a lot on networking (even compared to the naive approach, that requires 2 rounds of communication) since this is a non-interactive protocol and each builders emits his best offer as soon as the block is built directly to the proposer. The proposer also benefits from atomicity, since the block is emitted directly the header and payload - such desing prevents the builder to exploit slot time window and delay blocks, see ~\ref{subsection:types-of-different-attack}.
+
+\paragraph{Stage 2: Dispute-Triggered Validation.}
+The second stage is invoked only upon challenge or inconsistency detection—when a proposer or peer disputes the validity of the block header, payload, or fee accounting. In this fallback path, a challenger invokes verification smart contract to attest that a certain block proof, with block hash, fee and payload fails.
+
+\[
+\mathsf{Verify}(vk,\, \pi(b_{i,s}),\, h(b_{i,s}) || f_{i,s} || b_{i,s}) = 0
+\]
+
+In such a case, the builder will be slashed and the proposer would be compensated accordingly.
+Thus, the protocol achieves trustless validation without redundant verification overhead in the optimistic path.
+
+\input{zk-pbs-protocol-dispute.tex}
+
+
+\paragraph{Rationale.}
+This two-stage design unifies the efficiency of optimistic approach with the accountability of zero-knowledge proofs. Rather than continuously verifying every block during slot time, we verify only upon dispute—achieving efficiency while preserving verifiability. It thereby creates a cryptoeconomic equilibrium in which honest behavior is the cheapest strategy and verification is avoided unless needed.
